@@ -13,7 +13,8 @@ module ActiveAdmin::SortableTree
                              :protect_root => false,
                              :collapsible => false, #hides +/- buttons
                              :start_collapsed => false,
-                             :sortable => true
+                             :sortable => true,
+                             :enforce_root => true
 
       # BAD BAD BAD FIXME: don't pollute original class
       @sortable_options = options
@@ -28,12 +29,22 @@ module ActiveAdmin::SortableTree
           res[resource_class.find(resource)] = resource_class.find(parent_resource) rescue nil
           res
         end
+
         errors = []
+
         ActiveRecord::Base.transaction do
           records.each_with_index do |(record, parent_record), position|
             record.send "#{options[:sorting_attribute]}=", position
             if options[:tree]
-              record.send "#{options[:parent_method]}=", parent_record
+              if !options[:enforce_root]
+                record.send "#{options[:parent_method]}=", parent_record
+              else
+                if parent_record.present?
+                  record.send "#{options[:parent_method]}=", parent_record
+                else
+                  record.send "#{options[:parent_method]}=", record.root
+                end
+              end
             end
             errors << {record.id => record.errors} if !record.save
           end
